@@ -1,16 +1,10 @@
 {
     "version": 2,
     "builds": [
-      {
-        "src": "rox_app.py",
-        "use": "vercel-python"
-      }
+      { "src": "server.py", "use": "@vercel/python" }
     ],
     "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "rox_app.py"
-      }
+      { "src": "/(.*)", "dest": "server.py" }
     ]
   }
   
