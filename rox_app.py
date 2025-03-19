@@ -1,7 +1,8 @@
 import streamlit as st
-import polars as pl
+import pandas as pd
 import io
-import pdfkit
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 # Configuração da Página
 st.set_page_config(page_title="Cálculo de ROX", layout="wide")
@@ -104,23 +105,28 @@ col7.metric(label="Total de Ganhos Após a Ação (R$)", value=f"{total_ganhos:,
 col8.metric(label="Investimento Total (R$)", value=f"{investimento_total:,.2f}")
 col9.metric(label="ROX Calculado (%)", value=f"{rox:.2f}%")
 
-# Exportação de Dados
-st.header("📥 Exportar para arquivo:")
-export_format = st.radio("", ["PDF", "Excel/Sheets"])
+# Função para gerar PDF com ReportLab
+def gerar_pdf(conteudo):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    
+    c.drawString(100, 750, "Relatório de ROX")
+    c.drawString(100, 730, f"Nome da Ação: {conteudo['nome_iniciativa']}")
+    c.drawString(100, 710, f"Produto/Serviço: {conteudo['produto_servico']}")
+    c.drawString(100, 690, f"Data Início: {conteudo['data_inicio']}")
+    c.drawString(100, 670, f"Data Fim: {conteudo['data_fim']}")
+    c.drawString(100, 650, f"Investimento Total: R$ {conteudo['investimento_total']:,.2f}")
+    c.drawString(100, 630, f"Total de Ganhos: R$ {conteudo['total_ganhos']:,.2f}")
+    c.drawString(100, 610, f"ROX Calculado: {conteudo['rox']:.2f}%")
+    
+    c.save()
+    buffer.seek(0)
+    return buffer
 
-if st.button("Exportar"):
-    if export_format == "PDF":
-        pdf_output = f"""
-        <h2>Relatório de ROX</h2>
-        <p><strong>Nome da Ação:</strong> {nome_iniciativa}</p>
-        <p><strong>Produto/Serviço:</strong> {produto_servico}</p>
-        <p><strong>Data Início:</strong> {data_inicio_formatada}</p>
-        <p><strong>Data Fim:</strong> {data_fim_formatada}</p>
-        <p><strong>Investimento Total:</strong> R$ {investimento_total:,.2f}</p>
-        <p><strong>Total de Ganhos:</strong> R$ {total_ganhos:,.2f}</p>
-        <p><strong>ROX Calculado:</strong> {rox:.2f}%</p>
-        """
-        pdf_path = "relatorio_rox.pdf"
-        pdfkit.from_string(pdf_output, pdf_path, options={"encoding": "UTF-8"})
-        with open(pdf_path, "rb") as f:
-            st.download_button("📥 Baixar PDF", data=f, file_name="ROX_Calculo.pdf", mime="application/pdf")
+if st.button("📥 Baixar PDF"):
+    pdf = gerar_pdf({
+        "nome_iniciativa": nome_iniciativa, "produto_servico": produto_servico,
+        "data_inicio": data_inicio_formatada, "data_fim": data_fim_formatada,
+        "investimento_total": investimento_total, "total_ganhos": total_ganhos, "rox": rox
+    })
+    st.download_button("Baixar Relatório ROX", pdf, "ROX_Calculo.pdf", "application/pdf")
