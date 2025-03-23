@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import io
+import gspread
+import os
+from oauth2client.service_account import ServiceAccountCredentials
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -105,28 +108,51 @@ col7.metric(label="Total de Ganhos Após a Ação (R$)", value=f"{total_ganhos:,
 col8.metric(label="Investimento Total (R$)", value=f"{investimento_total:,.2f}")
 col9.metric(label="ROX Calculado (%)", value=f"{rox:.2f}%")
 
-# Função para gerar PDF com ReportLab
-def gerar_pdf(conteudo):
+# Exportação para Google Sheets
+if st.button("📤 Exportar para Google Sheets"):
+    credenciais_path = "seu_arquivo_credenciais.json"
+    
+    if os.path.exists(credenciais_path):
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name(credenciais_path, scope)
+        client = gspread.authorize(creds)
+
+        sheet = client.open("Relatórios ROX").sheet1
+        sheet.append_row([nome_iniciativa, produto_servico, data_inicio, data_fim, total_vendas_antes, gasto_extra_antes, total_antes, total_ganhos, rox])
+
+        st.success("Exportado para Google Sheets com sucesso!")
+    else:
+        st.error("Erro: Arquivo de credenciais não encontrado!")
+
+# Exportação para PDF
+def gerar_pdf():
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
-    
-    c.drawString(100, 750, "Relatório de ROX")
-    c.drawString(100, 730, f"Nome da Ação: {conteudo['nome_iniciativa']}")
-    c.drawString(100, 710, f"Produto/Serviço: {conteudo['produto_servico']}")
-    c.drawString(100, 690, f"Data Início: {conteudo['data_inicio']}")
-    c.drawString(100, 670, f"Data Fim: {conteudo['data_fim']}")
-    c.drawString(100, 650, f"Investimento Total: R$ {conteudo['investimento_total']:,.2f}")
-    c.drawString(100, 630, f"Total de Ganhos: R$ {conteudo['total_ganhos']:,.2f}")
-    c.drawString(100, 610, f"ROX Calculado: {conteudo['rox']:.2f}%")
-    
+    c.drawString(100, 750, f"Relatório de ROX - {nome_iniciativa}")
+    c.drawString(100, 730, f"Produto/Serviço: {produto_servico}")
+    c.drawString(100, 710, f"Data Início: {data_inicio} - Data Fim: {data_fim}")
+    c.drawString(100, 690, f"Total de Vendas Antes da Ação: R$ {total_vendas_antes:,.2f}")
+    c.drawString(100, 670, f"Gasto Adicional Antes da Ação: R$ {gasto_extra_antes:,.2f}")
+    c.drawString(100, 650, f"Total Antes da Ação: R$ {total_antes:,.2f}")
+    c.drawString(100, 630, f"Total de Ganhos: R$ {total_ganhos:,.2f}")
+    c.drawString(100, 610, f"ROX Calculado: {rox:.2f}%")
+    c.showPage()
     c.save()
     buffer.seek(0)
     return buffer
 
-if st.button("📥 Baixar PDF"):
-    pdf = gerar_pdf({
-        "nome_iniciativa": nome_iniciativa, "produto_servico": produto_servico,
-        "data_inicio": data_inicio_formatada, "data_fim": data_fim_formatada,
-        "investimento_total": investimento_total, "total_ganhos": total_ganhos, "rox": rox
-    })
-    st.download_button("Baixar Relatório ROX", pdf, "ROX_Calculo.pdf", "application/pdf")
+pdf_buffer = gerar_pdf()
+st.download_button(label="📄 Baixar PDF", data=pdf_buffer, file_name="relatorio_rox.pdf", mime="application/pdf")
+
+# Exportação para Excel
+df = pd.DataFrame({
+    "Nome da Ação": [nome_iniciativa],
+    "Produto/Serviço": [produto_servico],
+    "Total de Vendas Antes da Ação (R$)": [total_vendas_antes],
+    "Gasto Adicional Antes da Ação (R$)": [gasto_extra_antes],
+    "Total Antes da Ação (R$)": [total_antes],
+    "Total de Ganhos (R$)": [total_ganhos],
+    "ROX (%)": [rox]
+})
+
+st.download_button(label="📥 Baixar Planilha Excel", data=df.to_csv(index=False), file_name="rox_calculo.csv", mime="text/csv")
